@@ -1,0 +1,6 @@
+include README.md
+include requirements.txt
+recursive-include model_files *
+recursive-include data *.csv *.parquet
+recursive-exclude * __pycache__
+recursive-exclude * *.pyc
