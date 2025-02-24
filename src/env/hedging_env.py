@@ -154,8 +154,7 @@ class HedgingEnv(gym.Env):
         else: 
             pnl_term_value = np.abs(per_share_step_pnl) / (s0_floor + 1e-9)
 
-        # BUG: Should be negative sign here, but using positive (will be fixed in commit 8)
-        reward_pnl_component = self.pnl_penalty_weight * pnl_term_value
+        reward_pnl_component = -self.pnl_penalty_weight * pnl_term_value
         transaction_cost_penalty = self.lambda_cost * transaction_costs_this_step
         current_reward = reward_pnl_component - transaction_cost_penalty
         
