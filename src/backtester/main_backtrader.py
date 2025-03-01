@@ -60,7 +60,7 @@ class DRLHedgingStrategy(bt.Strategy):
                   max_trade_per_step=100,option_tenor_years=30/252,
                   risk_free_rate=0.02,episode_length=252,warmup_period=5,
                   artifacts_path='model_files/',options_df=None,
-                  commission_per_contract=0.65,slippage_perc=0.01,
+                  commission_per_contract=0.65,slippage_perc=0.001,
                   expiry_roll_days=7,prog_ns=None)
     def __init__(self):
         self.spy=self.datas[0]
