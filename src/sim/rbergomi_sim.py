@@ -223,7 +223,10 @@ def fractional_gaussian_gpu(phi_val_gpu, Z_val_gpu, H_param_arr, eta_param_arr, 
         A_gpu = phi_val_gpu[:, None, :] * Z_val_gpu
         A_ifft_gpu = cp.fft.ifft(A_gpu, axis=2).real
         scale_val = cp.sqrt(2 * H_param_arr[:, None, None]) * eta_param_arr[:, None, None]
-        return scale_val * A_ifft_gpu[..., :out_len_val]
+        result = scale_val * A_ifft_gpu[..., :out_len_val]
+        del A_gpu, A_ifft_gpu
+        cp.cuda.Stream.null.synchronize()
+        return result
     elif Z_val_gpu.ndim == 2:
         A_gpu = phi_val_gpu * Z_val_gpu 
         A_ifft_gpu = cp.fft.ifft(A_gpu, axis=1).real
@@ -308,6 +311,11 @@ def price_rbergomi_option_gpu(S0_batch_gpu, K_batch_gpu, T_opt_val, r_opt_val,
         payoffs_final_gpu = cp.maximum(K_batch_gpu[:, None] - terminal_prices_opt_gpu, 0.0)
         
     option_prices_batch_gpu = cp.mean(payoffs_final_gpu, axis=1) * cp.exp(-r_opt_val * T_opt_val)
+    
+    # Clean up large intermediate arrays
+    del X_paths_opt_gpu, v_paths_opt_gpu, w_complex_opt_gpu
+    del dW1_unscaled_opt_gpu, dW2_unscaled_opt_gpu, payoffs_final_gpu
+    
     return option_prices_batch_gpu
 
 
@@ -386,6 +394,10 @@ def generate_paths_and_options(historical_prices_np_main, num_paths_main, r_main
         w_complex_main_gpu = cp.fft.ifft(Z_main_gpu, axis=1, n=M_main_val_init)
         dW1_unscaled_main_gpu = w_complex_main_gpu.real * cp.sqrt(float(M_main_val_init))
         dW2_unscaled_main_gpu = w_complex_main_gpu.imag * cp.sqrt(float(M_main_val_init))
+        
+        # Clean up intermediate GPU arrays
+        del w_complex_main_gpu
+        cp.cuda.Stream.null.synchronize()
 
         paths_main_gpu = cp.zeros((num_paths_main, N_STEPS + 1), dtype=cp.float64)
         paths_main_gpu[:, 0] = S0_arr_gpu
@@ -468,6 +480,8 @@ def generate_paths_and_options(historical_prices_np_main, num_paths_main, r_main
             
             paths_main_gpu[:, j_main_val] = paths_main_gpu[:, j_main_val - 1] * cp.exp(drift_main_gpu + diff_main_gpu)
             paths_main_gpu[:, j_main_val] = cp.maximum(paths_main_gpu[:, j_main_val], 1e-8)
+            
+            cp.cuda.Stream.null.synchronize()
             
             np.savez_compressed(CHECKPOINT_FILE_TEMP_STEM,
                 paths_main_gpu=cp.asnumpy(paths_main_gpu),
