@@ -14,6 +14,7 @@ from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
 
 # Add project root to path
 _project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -33,6 +34,11 @@ N_TRIALS = 50
 N_TIMESTEPS_HPO = 50000
 N_EVAL_EPISODES = 10
 EVAL_FREQ = 5000
+
+# Checkpoint configuration
+CHECKPOINT_FREQ = 10000
+CHECKPOINT_DIR = "./checkpoints/"
+BEST_MODEL_DIR = "./best_models/"
 
 def create_env(loss_type="abs", pnl_penalty_weight=0.01, lambda_cost=1.0, seed=42):
     """Create a monitored environment"""
@@ -97,8 +103,38 @@ def train_agent(loss_type="abs", pnl_penalty_weight=0.01, lambda_cost=1.0,
         verbose=0
     )
     
+    # Setup checkpointing and evaluation
+    os.makedirs(CHECKPOINT_DIR, exist_ok=True)
+    os.makedirs(BEST_MODEL_DIR, exist_ok=True)
+    
+    # Create checkpoint callback
+    checkpoint_callback = CheckpointCallback(
+        save_freq=CHECKPOINT_FREQ,
+        save_path=CHECKPOINT_DIR,
+        name_prefix=f"rl_model_{loss_type}_w{pnl_penalty_weight}_l{lambda_cost}"
+    )
+    
+    # Create evaluation environment for callback
+    eval_env_fns = [create_env(loss_type, pnl_penalty_weight, lambda_cost, seed + 1000 + i) for i in range(N_ENVS)]
+    eval_env = SubprocVecEnv(eval_env_fns)
+    
+    # Create evaluation callback
+    eval_callback = EvalCallback(
+        eval_env,
+        best_model_save_path=BEST_MODEL_DIR,
+        log_path=f"./logs/",
+        eval_freq=EVAL_FREQ,
+        n_eval_episodes=N_EVAL_EPISODES,
+        deterministic=True
+    )
+    
     print(f"Training for {total_timesteps} timesteps...")
-    model.learn(total_timesteps=total_timesteps)
+    model.learn(
+        total_timesteps=total_timesteps,
+        callback=[checkpoint_callback, eval_callback]
+    )
+    
+    eval_env.close()
     
     env.close()
     return model
