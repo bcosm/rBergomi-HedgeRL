@@ -319,7 +319,7 @@ def run_final_training(loss_type, pnl_w, lam_c, best_hpo_params, run_seed):
         steps_done = 0 
         logging.info("No suitable checkpoint found or VecNormalize missing. Starting final training from scratch.")
         lr_val = best_hpo_params["lr"]
-        lr_schedule_fn = linear_schedule(lr_val, lr_val * 1.0) 
+        lr_schedule_fn = linear_schedule(lr_val, lr_val * 0.1) 
 
         clip_range_val = best_hpo_params.get("clip_range", 0.3) 
         log_std_init_val = best_hpo_params.get("log_std_init", 1.5)
@@ -603,7 +603,7 @@ def main():
     else:
         return main_cmdline()
 
-def main_cli(loss_type="abs", w=0.001, lam=0.0001, seed=12345):
+def main_cli(loss_type="abs", w=0.05, lam=0.001, seed=12345):
     global MODE
     
     os.makedirs(OPTUNA_DB_DIR, exist_ok=True)
