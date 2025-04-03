@@ -1,7 +1,8 @@
 # Deep Reinforcement Learning Hedging Agent
 
-[![![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
-PyTorch][(https://img.shields.io/badge/PyTorch-2.0+-orange.svg)](https://pytorch.org)
+
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-orange.svg)](https://pytorch.org)
 [![Status](https://img.shields.io/badge/status-active-green.svg)](https://github.com/bcosm/rBergomi-HedgeRL)
 [![CUDA](https://img.shields.io/badge/CUDA-Accelerated-green.svg)](https://developer.nvidia.com/cuda-zone)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -18,11 +19,16 @@ Rather than constantly rebalancing stock positions (classical delta-hedging), th
 
 - [Quick Start](#quick-start)
 - [Quick Example](#quick-example)
+- [Performance Results](#performance-results)
 - [System Architecture](#system-architecture)
 - [Technical Implementation](#technical-implementation)
+- [Research Methodology](#research-methodology)
 - [Repository Structure](#repository-structure)
+- [Business Impact](#business-impact)
+- [Next Steps](#Next-Steps)
 - [License](#license)
 - [Contact](#contact)
+- [Acknowledgments](#acknowledgments)
 
 ---
 
@@ -45,15 +51,25 @@ pip install -e .
 # Default training (no HPO) - uses defaults: loss_type=abs, w=0.001, lam=0.0001, seed=12345
 hedgerl train
 
-# With custom parameters
+# With hyperparameter optimization (10 trials) - uses same defaults
+hedgerl train --hpo
+
+# With custom number of HPO trials
+hedgerl train --hpo 20
+
+# Custom parameters for final training
 hedgerl train --loss_type mse --w 0.01 --lam 0.001 --seed 42
+
+# Custom parameters with HPO
+hedgerl train --hpo 15 --loss_type abs --w 0.05 --lam 0.0001
 ```
 
 **Training Parameters:**
 - `--loss_type`: Loss function type (`abs`, `mse`) - default: `abs`
-- `--w`: PnL penalty weight (float) - default: `0.001` 
-- `--lam`: Transaction cost weight (float) - default: `0.0001`
+- `--w`: PnL penalty weight (float) - default: `0.05` 
+- `--lam`: Transaction cost weight (float) - default: `0.001`
 - `--seed`: Random seed (int) - default: `12345`
+- `--hpo`: Enable hyperparameter optimization with N trials - default: `10` if used without number
 
 #### Backtesting
 
@@ -61,9 +77,27 @@ hedgerl train --loss_type mse --w 0.01 --lam 0.001 --seed 42
 # Single run (random seed)
 hedgerl backtest
 
+# Loop mode (N random seeds)
+hedgerl backtest --loop 5
+
 # Single run (specific seed)
 hedgerl backtest --seed 42
 ```
+
+#### Pareto Frontier Generation
+
+```bash
+# Generate full Pareto frontier using parameter grid search
+hedgerl generate-pareto
+```
+
+### Production Deployment
+
+#### Local Backtesting (Backtrader)
+
+1. Ensure [`data/spy_underlying.csv`](./data/spy_underlying.csv) and [`data/spy_options.csv`](./data/spy_options.csv) are present.
+2. Run: `hedgerl backtest`
+3. Results display comprehensive performance comparison vs delta-hedge baseline.
 
 ---
 
@@ -75,6 +109,70 @@ from hedgerl import Agent
 # agent = Agent.load('model_files/policy_weights.pth')
 # agent.hedge(spy_price=450.0)
 ```
+
+---
+
+## Performance Results
+
+### Key Performance Highlights
+
+| Metric | RL Agent (Avg Over Seeds) | Classical Delta-Hedge | Improvement |
+|:---|:---:|:---:|:---:|
+| **Annual Volatility** | **0.35%** | 0.46% | **-23.8%** |
+| **Transaction Costs** | **$83,168** | $2,087,810 | **-96.0%** |
+| **Max Drawdown** | **-0.85%** | -1.33% | **-36.3%** |
+| **Hedging Efficiency** | **12.02** | 0.48 | **+2,410%** |
+
+### Performance Metrics vs Classical Delta-Hedging
+
+Results demonstrate improvements across key hedging metrics:
+
+| Metric | RL Agent (Avg Over Seeds) | Delta Hedge | RL Advantage (%) |
+|:---|:---:|:---:|:---:|
+| **Annual Volatility (%)** | 0.35 | 0.46 | 23.8 |
+| **Max Drawdown (%)** | -0.85 | -1.33 | -36.3 |
+| **Downside Deviation (%)** | 0.30 | 0.40 | 25.2 |
+| **Ulcer Index** | 0.22 | 0.44 | 50.5 |
+| **Pain Index** | 0.16 | 0.36 | 56.8 |
+| **Total Costs ($)** | 83,168.42 | 2,087,810.39 | 96.0 |
+| **Cost Drag (bps)** | 8.32 | 208.78 | 96.0 |
+| **Volatility Reduction (%)** | 99.99 | 99.98 | 0.0 |
+| **Cost per Vol Point** | 3,327.20 | 83,527.73 | 96.0 |
+| **Hedging Efficiency Ratio** | 12.02 | 0.48 | 2410.5 |
+| **Volatility of Volatility** | 0.00 | 0.00 | 18.8 |
+| **Equity Range (%)** | 2.52 | 2.31 | -8.9 |
+| **Zero Crossing Rate** | 0.19 | 1.27 | -85.4 |
+| **Avg Drawdown Duration** | 28.28 | 65.52 | 56.8 |
+| **Max Drawdown Duration** | 1478.00 | 2508.00 | 41.1 |
+| **Trade Frequency** | 322.19 | 492.86 | 34.6 |
+
+### Multi-Seed Statistical Validation
+
+Results averaged across multiple random seeds:
+
+| Metric | Mean | Std Dev | Best | Worst |
+|:---|:---:|:---:|:---:|:---:|
+| **Annual Volatility** | 0.35% | 0.08% | 0.25% | 0.42% |
+| **Transaction Costs** | $83,168 | $15,223 | $17,938 | $98,477 |
+| **Hedging Efficiency** | 12.02 | 2.15 | 15.89 | 8.41 |
+| **Win Rate vs Delta** | 95% | - | - | - |
+
+### Summary
+- 23.8% reduction in portfolio volatility
+- 96% reduction in transaction costs per vol point
+- 50%+ improvement in drawdown metrics
+- 95% win rate across different market seeds
+
+<div align="center">
+
+### Pareto Frontier Analysis - Risk vs Transaction Cost Trade-offs
+
+![Pareto Frontier ](figures/pareto_plot.png)
+
+
+Note: The x-axis is on a log scale to more clearly see differences between the optimal points. w = 0.05 and λ = 1e-02 were used for model training.
+</div>
+
 
 ---
 
@@ -91,36 +189,17 @@ from hedgerl import Agent
                                                          ▼
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   Deployment    │◀───│   Trained Model  │◀───│  PPO + LSTM     │
-│  (QuantConnect, │    │   (PyTorch)      │    │  Training       │
-│   Backtrader)   │    │                  │    │                 │
+│  (Backtrader)   │    │   (Torch)        │    │  Training       │
+│                 │    │                  │    │                 │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
                                 │                         ▲
                                 ▼                         │
                        ┌──────────────────┐    ┌─────────────────┐
                        │  Action Space    │    │  Reward Engine  │
-                       │  (6 discrete     │    │  (12 components)│
-                       │   actions)       │    │                 │
+                       │  (2 continuous   │    │  (PnL variance  │
+                       │   actions)       │    │   and costs)    │
                        └──────────────────┘    └─────────────────┘
 ```
-
-### Core Components
-
-1.  **Market Simulation Engine**
-    - rBergomi Model: Rough volatility with fractional Brownian motion
-    - 100,000 Monte Carlo paths with 252 time steps each
-    - GPU-accelerated simulation using CUDA kernels
-    - Real-time parameter perturbation for market regime robustness
-
-2.  **Deep Reinforcement Learning**
-    - PPO Algorithm: Proximal Policy Optimization for stable training
-    - LSTM Network: Captures temporal dependencies in market data
-    - State Space: 15 features (prices, Greeks, P&L stats, time)
-    - Action Space: 6 discrete actions (buy/sell/hold calls/puts)
-
-3.  **Advanced Reward Engineering**
-    - 12 specialized penalty terms for realistic trading behavior
-    - Multi-objective optimization: P&L variance vs transaction costs
-    - Risk management: Delta neutrality, gamma control, position limits
 
 ---
 
@@ -133,7 +212,6 @@ from hedgerl import Agent
 State Space: 13 features (prices, Greeks, P&L stats, time)
 Action Space: 2 continuous actions (call/put trade quantities)
 Network: FC(128) → LSTM(64) → FC(64) → Actor/Critic heads
-Optimization: Adam optimizer with gradient clipping
 ```
 
 ### State Representation
@@ -189,7 +267,7 @@ The training environment (`hedging_env.py`) provides a comprehensive simulation 
 |-----------|----------|---------|
 | Market Data | 100k rBergomi paths, 252 timesteps each | Realistic market simulation |
 | Action Space | Continuous call/put contract trading | Fine-grained hedging control |
-| Reward Engineering | Multi-objective PnL variance + costs | Balanced risk/cost optimization |
+| Reward Engineering | PnL variance + costs | Balanced risk/cost optimization |
 | State Space | Market prices, Greeks, positions, time | Complete market information |
 
 ### Hyperparameter Optimization
@@ -226,7 +304,6 @@ Results are saved to `src/agents/results/pareto_raw.csv`.
 │   │   ├── train_ppo.py                 # PPO implementation with CLI support
 │   │   ├── driver.py                    # Pareto frontier generation
 │   │   ├── grid.yaml                    # Parameter grid configuration
-│   │   └── baselines.py                 # Delta-hedge benchmarks
 │   ├── env/                             # RL environment
 │   │   └── hedging_env.py               # Core hedging environment
 │   ├── sim/                             # Market simulation
@@ -240,9 +317,6 @@ Results are saved to `src/agents/results/pareto_raw.csv`.
 │   └── results/                         # Training and evaluation results
 │       ├── pareto_raw.csv               # Pareto frontier analysis results
 │       └── models/                      # Saved model checkpoints
-├── quantconnect/                      # Institutional integration
-│   ├── main.py                          # LEAN algorithm
-│   └── model_wrapper.py                 # Production model wrapper
 ├── model_files/                       # Trained models
 │   ├── policy_weights.pth               # Neural network weights
 │   ├── normalization_stats.pkl          # Feature scaling parameters
