@@ -562,6 +562,8 @@ def convert_model_for_backtesting(model_save_dir, run_identifier):
         vec_env = VecNormalize.load(vecnorm_path, venv=None)
         
         normalization_stats = {
+            'obs_mean': vec_env.obs_rms.mean,
+            'obs_var': vec_env.obs_rms.var
         }
         
         normalization_stats_path = os.path.join(model_files_dir, "normalization_stats.pkl")
