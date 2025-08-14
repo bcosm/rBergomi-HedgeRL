@@ -18,7 +18,6 @@ Rather than constantly rebalancing stock positions (classical delta-hedging), th
 ## Table of Contents
 
 - [Quick Start](#quick-start)
-- [Quick Example](#quick-example)
 - [Performance Results](#performance-results)
 - [System Architecture](#system-architecture)
 - [Technical Implementation](#technical-implementation)
@@ -98,17 +97,6 @@ hedgerl generate-pareto
 1. Ensure [`data/spy_underlying.csv`](./data/spy_underlying.csv) and [`data/spy_options.csv`](./data/spy_options.csv) are present.
 2. Run: `hedgerl backtest`
 3. Results display comprehensive performance comparison vs delta-hedge baseline.
-
----
-
-## Quick Example
-
-```python
-from hedgerl import Agent
-# This is a conceptual example; actual implementation may vary
-# agent = Agent.load('model_files/policy_weights.pth')
-# agent.hedge(spy_price=450.0)
-```
 
 ---
 
